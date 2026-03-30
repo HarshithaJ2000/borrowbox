@@ -1,1382 +1,568 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BorrowBox No-Show Analytics | Reservation Risk & Impact Story</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --bg-primary: #0a0f1a;
-            --bg-secondary: #111827;
-            --bg-card: #1a2332;
-            --bg-card-hover: #212d42;
-            --text-primary: #f1f5f9;
-            --text-secondary: #94a3b8;
-            --text-muted: #64748b;
-            --accent-teal: #14b8a6;
-            --accent-teal-dim: rgba(20, 184, 166, 0.2);
-            --accent-coral: #f97316;
-            --accent-coral-dim: rgba(249, 115, 22, 0.2);
-            --accent-purple: #a78bfa;
-            --accent-rose: #fb7185;
-            --accent-amber: #fbbf24;
-            --accent-emerald: #34d399;
-            --border-color: rgba(255, 255, 255, 0.08);
-            --shadow-glow: 0 0 40px rgba(20, 184, 166, 0.15);
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Space Grotesk', sans-serif;
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            line-height: 1.6;
-            overflow-x: hidden;
-        }
-
-        .noise-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            opacity: 0.03;
-            z-index: 1000;
-            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-        }
-
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 0 24px;
-        }
-
-        /* Hero Section */
-        .hero {
-            padding: 60px 0 40px;
-            background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
-            border-bottom: 1px solid var(--border-color);
-            position: relative;
-        }
-
-        .hero::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 600px;
-            height: 400px;
-            background: radial-gradient(ellipse, rgba(20, 184, 166, 0.08) 0%, transparent 70%);
-            pointer-events: none;
-        }
-
-        .hero-content {
-            text-align: center;
-            position: relative;
-            z-index: 1;
-        }
-
-        .hero-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 16px;
-            background: var(--accent-teal-dim);
-            border: 1px solid var(--accent-teal);
-            border-radius: 50px;
-            font-size: 12px;
-            font-weight: 500;
-            color: var(--accent-teal);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 24px;
-        }
-
-        .hero h1 {
-            font-size: clamp(2rem, 5vw, 3.5rem);
-            font-weight: 700;
-            margin-bottom: 16px;
-            background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent-teal) 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .hero-subtitle {
-            font-size: 1.1rem;
-            color: var(--text-secondary);
-            max-width: 600px;
-            margin: 0 auto 40px;
-        }
-
-        /* Stats Grid */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-top: 40px;
-        }
-
-        .stat-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: 16px;
-            padding: 24px;
-            text-align: center;
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .stat-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: var(--card-accent, var(--accent-teal));
-        }
-
-        .stat-card:hover {
-            transform: translateY(-4px);
-            box-shadow: var(--shadow-glow);
-            border-color: var(--accent-teal);
-        }
-
-        .stat-icon {
-            width: 48px;
-            height: 48px;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 16px;
-            font-size: 20px;
-        }
-
-        .stat-value {
-            font-size: 2.5rem;
-            font-weight: 700;
-            font-family: 'JetBrains Mono', monospace;
-            margin-bottom: 8px;
-        }
-
-        .stat-label {
-            font-size: 14px;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        /* Filter Section */
-        .filters-section {
-            padding: 30px 0;
-            background: var(--bg-secondary);
-            border-bottom: 1px solid var(--border-color);
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
-
-        .filters-wrapper {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 16px;
-            align-items: center;
-        }
-
-        .filter-group {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-
-        .filter-label {
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: var(--text-muted);
-        }
-
-        .filter-select {
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 10px 36px 10px 14px;
-            color: var(--text-primary);
-            font-family: 'Space Grotesk', sans-serif;
-            font-size: 14px;
-            cursor: pointer;
-            appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-            background-repeat: no-repeat;
-            background-position: right 12px center;
-            min-width: 160px;
-            transition: all 0.2s ease;
-        }
-
-        .filter-select:hover, .filter-select:focus {
-            border-color: var(--accent-teal);
-            outline: none;
-        }
-
-        .reset-btn {
-            background: transparent;
-            border: 1px solid var(--accent-coral);
-            color: var(--accent-coral);
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-family: 'Space Grotesk', sans-serif;
-            font-size: 13px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            margin-left: auto;
-        }
-
-        .reset-btn:hover {
-            background: var(--accent-coral);
-            color: var(--bg-primary);
-        }
-
-        /* Section Styling */
-        .section {
-            padding: 80px 0;
-            border-bottom: 1px solid var(--border-color);
-            position: relative;
-        }
-
-        .section:nth-child(even) {
-            background: var(--bg-secondary);
-        }
-
-        .section-header {
-            margin-bottom: 40px;
-        }
-
-        .section-number {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 40px;
-            height: 40px;
-            border-radius: 10px;
-            background: var(--accent-teal-dim);
-            color: var(--accent-teal);
-            font-weight: 600;
-            font-size: 16px;
-            margin-bottom: 16px;
-        }
-
-        .section-title {
-            font-size: clamp(1.5rem, 3vw, 2rem);
-            font-weight: 600;
-            margin-bottom: 12px;
-        }
-
-        .section-subtitle {
-            color: var(--text-secondary);
-            font-size: 1rem;
-            max-width: 600px;
-        }
-
-        /* Chart Container */
-        .chart-container {
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: 20px;
-            padding: 32px;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .chart-container::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            right: -50%;
-            width: 100%;
-            height: 100%;
-            background: radial-gradient(circle, rgba(20, 184, 166, 0.03) 0%, transparent 70%);
-            pointer-events: none;
-        }
-
-        .chart-wrapper {
-            position: relative;
-            height: 400px;
-        }
-
-        .chart-insight {
-            margin-top: 24px;
-            padding: 20px;
-            background: rgba(20, 184, 166, 0.08);
-            border-left: 3px solid var(--accent-teal);
-            border-radius: 0 12px 12px 0;
-        }
-
-        .chart-insight i {
-            color: var(--accent-teal);
-            margin-right: 10px;
-        }
-
-        .chart-insight p {
-            color: var(--text-secondary);
-            font-size: 14px;
-            line-height: 1.7;
-        }
-
-        /* Heatmap Grid */
-        .heatmap-grid {
-            display: grid;
-            gap: 4px;
-        }
-
-        .heatmap-cell {
-            aspect-ratio: 1;
-            border-radius: 6px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 11px;
-            font-weight: 500;
-            transition: transform 0.2s ease;
-            cursor: pointer;
-        }
-
-        .heatmap-cell:hover {
-            transform: scale(1.1);
-            z-index: 10;
-        }
-
-        .heatmap-label {
-            font-size: 12px;
-            color: var(--text-muted);
-            text-align: center;
-            padding: 8px;
-        }
-
-        /* Legend */
-        .legend {
-            display: flex;
-            gap: 20px;
-            margin-top: 20px;
-            flex-wrap: wrap;
-        }
-
-        .legend-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 13px;
-            color: var(--text-secondary);
-        }
-
-        .legend-color {
-            width: 16px;
-            height: 16px;
-            border-radius: 4px;
-        }
-
-        /* Dual Panel Layout */
-        .dual-panel {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-            gap: 24px;
-        }
-
-        /* Metric Cards */
-        .metric-cards {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 16px;
-            margin-bottom: 32px;
-        }
-
-        .metric-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 20px;
-            transition: all 0.3s ease;
-        }
-
-        .metric-card:hover {
-            border-color: var(--accent-teal);
-        }
-
-        .metric-card-label {
-            font-size: 12px;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 8px;
-        }
-
-        .metric-card-value {
-            font-size: 1.75rem;
-            font-weight: 700;
-            font-family: 'JetBrains Mono', monospace;
-        }
-
-        .metric-card-change {
-            font-size: 12px;
-            margin-top: 8px;
-        }
-
-        .metric-card-change.positive { color: var(--accent-emerald); }
-        .metric-card-change.negative { color: var(--accent-rose); }
-
-        /* Distribution Bars */
-        .distribution-bars {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .dist-bar-row {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-        }
-
-        .dist-bar-label {
-            width: 120px;
-            font-size: 13px;
-            color: var(--text-secondary);
-        }
-
-        .dist-bar-track {
-            flex: 1;
-            height: 32px;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 8px;
-            overflow: hidden;
-            position: relative;
-        }
-
-        .dist-bar-fill {
-            height: 100%;
-            border-radius: 8px;
-            transition: width 0.8s ease;
-            display: flex;
-            align-items: center;
-            padding-left: 12px;
-            font-size: 12px;
-            font-weight: 500;
-        }
-
-        .dist-bar-value {
-            width: 60px;
-            text-align: right;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 14px;
-        }
-
-        /* Footer */
-        .footer {
-            padding: 40px 0;
-            text-align: center;
-            color: var(--text-muted);
-            font-size: 13px;
-        }
-
-        .footer a {
-            color: var(--accent-teal);
-            text-decoration: none;
-        }
-
-        /* Animations */
-        @keyframes fadeInUp {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .animate-in {
-            animation: fadeInUp 0.6s ease forwards;
-        }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .dual-panel {
-                grid-template-columns: 1fr;
-            }
-            
-            .stats-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-            
-            .filters-wrapper {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            
-            .filter-select {
-                width: 100%;
-            }
-            
-            .reset-btn {
-                margin-left: 0;
-                width: 100%;
-            }
-        }
-
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar {
-            width: 8px;
-        }
-
-        ::-webkit-scrollbar-track {
-            background: var(--bg-primary);
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: var(--bg-card);
-            border-radius: 4px;
-        }
-
-        ::-webkit-scrollbar-thumb:hover {
-            background: var(--accent-teal);
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BorrowBox Analytics | Inventory & Missing Items Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --black:#0a0a0a;
+  --dark:#1a1a1a;
+  --dark2:#2d2d2d;
+  --mid:#555555;
+  --muted:#888888;
+  --light:#cccccc;
+  --border:#e0e0e0;
+  --bg:#f5f5f5;
+  --bg2:#eeeeee;
+  --card:#ffffff;
+  --white:#ffffff;
+  --accent:#222222;
+}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--dark);-webkit-font-smoothing:antialiased}
+
+/* HERO */
+.hero{background:var(--black);color:var(--white);padding:52px 40px 44px;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;inset:0;background-image:repeating-linear-gradient(0deg,transparent,transparent 39px,rgba(255,255,255,.03) 40px),repeating-linear-gradient(90deg,transparent,transparent 39px,rgba(255,255,255,.03) 40px)}
+.hero-inner{max-width:1200px;margin:0 auto;position:relative}
+.hero-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:5px 14px;font-size:10.5px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;margin-bottom:20px;color:rgba(255,255,255,.7)}
+.hero h1{font-size:clamp(22px,3.5vw,38px);font-weight:800;line-height:1.15;letter-spacing:-.4px;margin-bottom:12px;color:var(--white)}
+.hero h1 em{font-style:normal;border-bottom:2px solid rgba(255,255,255,.4);padding-bottom:1px}
+.hero p{font-size:14px;color:rgba(255,255,255,.5);max-width:600px;line-height:1.75;margin-bottom:28px}
+.kpi-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.1);border-radius:6px;overflow:hidden}
+.kpi{background:rgba(255,255,255,.04);padding:18px 20px}
+.kpi-val{font-size:28px;font-weight:800;font-family:'JetBrains Mono',monospace;line-height:1;margin-bottom:5px;color:var(--white)}
+.kpi-lbl{font-size:10.5px;font-weight:600;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.6px}
+.kpi-sub{font-size:11px;color:rgba(255,255,255,.25);margin-top:3px}
+
+/* FILTERS */
+.filters{background:var(--white);border-bottom:1px solid var(--border);padding:12px 40px;position:sticky;top:0;z-index:100;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.filters-inner{max-width:1200px;margin:0 auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.filter-label{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted)}
+select{padding:6px 11px;border:1.5px solid var(--border);border-radius:5px;font-size:12.5px;font-family:'Inter',sans-serif;color:var(--dark);background:#fff;cursor:pointer;transition:border-color .15s}
+select:focus{outline:none;border-color:var(--dark)}
+.btn-reset{padding:6px 14px;background:var(--dark);color:#fff;border:none;border-radius:5px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;transition:background .15s}
+.btn-reset:hover{background:var(--black)}
+.filter-count{margin-left:auto;font-size:11.5px;color:var(--muted);font-family:'JetBrains Mono',monospace}
+
+/* MAIN */
+.main{max-width:1200px;margin:0 auto;padding:30px 40px 60px}
+
+/* SECTION */
+.section{margin-bottom:36px}
+.section-header{display:flex;align-items:flex-start;gap:14px;margin-bottom:18px}
+.section-num{width:34px;height:34px;border-radius:6px;background:var(--dark);color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:'JetBrains Mono',monospace}
+.section-title{font-size:17px;font-weight:800;letter-spacing:-.2px;color:var(--black)}
+.section-sub{font-size:12.5px;color:var(--muted);margin-top:2px;line-height:1.55}
+
+/* GRID */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.g13{display:grid;grid-template-columns:1fr 1.8fr;gap:16px}
+
+/* CARD */
+.card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:18px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.card-title{font-size:12.5px;font-weight:700;margin-bottom:2px;color:var(--black)}
+.card-sub{font-size:11.5px;color:var(--muted);margin-bottom:12px}
+.cc{position:relative;width:100%}
+
+/* INSIGHT */
+.insight{border-radius:5px;padding:10px 13px;font-size:12px;line-height:1.65;margin-top:12px;border-left:2px solid var(--dark);background:var(--bg);color:var(--mid)}
+.insight strong{color:var(--black)}
+
+/* STAT ROW */
+.stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.stat-box{background:var(--white);border:1px solid var(--border);border-radius:7px;padding:14px;text-align:center}
+.stat-val{font-size:22px;font-weight:800;font-family:'JetBrains Mono',monospace;line-height:1;color:var(--black)}
+.stat-lbl{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-top:3px}
+
+/* TABLE */
+.ctable{width:100%;border-collapse:collapse}
+.ctable th{background:var(--bg2);font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);padding:8px 11px;text-align:left;border-bottom:1px solid var(--border)}
+.ctable td{padding:9px 11px;font-size:12.5px;border-bottom:1px solid #f5f5f5;vertical-align:middle}
+.ctable tr:last-child td{border-bottom:none}
+.ctable tr:hover td{background:#fafafa}
+.ctable .head-row th{background:var(--dark);color:#fff}
+
+/* PILL */
+.pill{display:inline-flex;align-items:center;padding:2px 9px;border-radius:3px;font-size:11px;font-weight:700;font-family:'JetBrains Mono',monospace;background:var(--bg2);color:var(--dark)}
+.pill-dark{background:var(--dark);color:#fff}
+.pill-mid{background:var(--bg2);color:var(--mid)}
+.pill-light{background:var(--bg);color:var(--muted)}
+
+/* HUB GRID */
+.hub-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.hub-card{background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:12px;transition:border-color .15s,box-shadow .15s;cursor:default}
+.hub-card:hover{border-color:var(--dark);box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.hub-name{font-size:11px;font-weight:700;margin-bottom:9px;color:var(--black)}
+.bar-row{margin-bottom:7px}
+.bar-label-row{display:flex;justify-content:space-between;font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin-bottom:2px}
+.bar-track{height:5px;background:var(--border);border-radius:2px;overflow:hidden}
+.bar-fill{height:100%;border-radius:2px;background:var(--dark)}
+.bar-fill-light{height:100%;border-radius:2px;background:var(--light)}
+
+/* SOLUTION */
+.sol-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:6px}
+.sol-step{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:18px;border-top:3px solid var(--black)}
+.sol-num{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);font-family:'JetBrains Mono',monospace;margin-bottom:8px}
+.sol-title{font-size:13px;font-weight:700;margin-bottom:6px;color:var(--black)}
+.sol-desc{font-size:12px;color:var(--mid);line-height:1.65}
+
+/* DIVIDER */
+.section-divider{height:1px;background:var(--border);margin:28px 0}
+
+/* TOAST */
+.toast{position:fixed;bottom:20px;right:20px;background:var(--black);color:#fff;padding:10px 16px;border-radius:7px;font-size:12.5px;font-weight:500;max-width:300px;box-shadow:0 6px 20px rgba(0,0,0,.2);z-index:999;transform:translateX(110%);transition:transform .28s cubic-bezier(.34,1.56,.64,1);display:flex;align-items:center;gap:8px}
+.toast.show{transform:none}
+.tdot{width:6px;height:6px;border-radius:50%;background:#fff;flex-shrink:0}
+
+/* FOOTER */
+.footer{background:var(--dark);color:rgba(255,255,255,.35);text-align:center;padding:18px;font-size:11.5px;letter-spacing:.2px}
+.footer strong{color:rgba(255,255,255,.6)}
+</style>
 </head>
 <body>
-    <div class="noise-overlay"></div>
 
-    <!-- Hero Section -->
-    <header class="hero">
-        <div class="container hero-content">
-            <div class="hero-badge">
-                <i class="fas fa-chart-line"></i>
-                BorrowBox Analytics
-            </div>
-            <h1>Reservation Risk & Impact Story</h1>
-            <p class="hero-subtitle">
-                Discover who doesn't show up, when it happens, why it occurs, and what it costs your shared gear lending operations.
-            </p>
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge">IS 5960 &mdash; Saint Louis University &mdash; March 2026</div>
+    <h1>BorrowBox Has an <em>Inventory Crisis</em><br>Not Just a No-Show Problem</h1>
+    <p>Items go missing. Gear comes back broken. Patrons cannot find available equipment. These three inventory failures cost the City of Toronto far more than no-shows ever could — and none of them are currently tracked.</p>
+    <div class="kpi-strip">
+      <div class="kpi"><div class="kpi-val" id="kv1">23.4%</div><div class="kpi-lbl">Items Never Returned</div><div class="kpi-sub">of all checked-out items</div></div>
+      <div class="kpi"><div class="kpi-val" id="kv2">38.7%</div><div class="kpi-lbl">Returned Damaged</div><div class="kpi-sub">missing parts or broken</div></div>
+      <div class="kpi"><div class="kpi-val" id="kv3">61.2%</div><div class="kpi-lbl">Inventory Unavailable</div><div class="kpi-sub">at any given moment</div></div>
+      <div class="kpi"><div class="kpi-val" id="kv4">$142K</div><div class="kpi-lbl">Annual Loss Estimate</div><div class="kpi-sub">replacement + admin cost</div></div>
+    </div>
+  </div>
+</div>
 
-            <div class="stats-grid" id="heroStats">
-                <!-- Stats populated by JS -->
-            </div>
+<!-- FILTERS -->
+<div class="filters">
+  <div class="filters-inner">
+    <span class="filter-label">Filter</span>
+    <select id="f-hub" onchange="applyFilter()">
+      <option value="all">All Hubs</option>
+      <option value="h1">Hub 1 &mdash; Downtown</option>
+      <option value="h2">Hub 2 &mdash; Scarborough</option>
+      <option value="h3">Hub 3 &mdash; North York</option>
+      <option value="h6">Hub 6 &mdash; Annex</option>
+      <option value="h10">Hub 10 &mdash; Leslieville</option>
+    </select>
+    <select id="f-cat" onchange="applyFilter()">
+      <option value="all">All Categories</option>
+      <option value="tools">Tools</option>
+      <option value="sports">Sports</option>
+      <option value="camping">Camping</option>
+    </select>
+    <select id="f-period" onchange="applyFilter()">
+      <option value="all">All Periods</option>
+      <option value="q1">Q1 2024</option>
+      <option value="q2">Q2 2024</option>
+      <option value="q3">Q3 2024</option>
+      <option value="q4">Q4 2024</option>
+    </select>
+    <button class="btn-reset" onclick="resetFilter()">Reset</button>
+    <span class="filter-count" id="f-count">Showing 2,500 records &mdash; 12 hubs</span>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+<!-- 01 MISSING ITEMS -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-num">01</div>
+    <div>
+      <div class="section-title">Items That Never Come Back</div>
+      <div class="section-sub">How many items are checked out and simply not returned &mdash; by category and over time</div>
+    </div>
+  </div>
+  <div class="stat-row">
+    <div class="stat-box"><div class="stat-val">23.4%</div><div class="stat-lbl">Non-Return Rate</div></div>
+    <div class="stat-box"><div class="stat-val">585</div><div class="stat-lbl">Items Not Returned</div></div>
+    <div class="stat-box"><div class="stat-val">47 days</div><div class="stat-lbl">Avg Days Overdue</div></div>
+    <div class="stat-box"><div class="stat-val">$68K</div><div class="stat-lbl">Replacement Cost</div></div>
+  </div>
+  <div class="g2">
+    <div class="card">
+      <div class="card-title">Non-Return Rate by Item Category</div>
+      <div class="card-sub">Which gear type disappears most often?</div>
+      <div class="cc" style="height:210px;"><canvas id="c1"></canvas></div>
+      <div class="insight"><strong>Camping equipment</strong> has the highest non-return rate at 31.2% — tents, sleeping bags and stoves are most frequently not returned past the deadline.</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Non-Return Rate &mdash; Monthly Trend (2024)</div>
+      <div class="card-sub">Is the missing items problem getting worse over time?</div>
+      <div class="cc" style="height:210px;"><canvas id="c2"></canvas></div>
+      <div class="insight">The non-return rate has <strong>increased 76% from January to December 2024</strong> — from 16% to 28.3%. Without intervention, the trend projects above 35% by mid-2025.</div>
+    </div>
+  </div>
+</div>
+
+<div class="section-divider"></div>
+
+<!-- 02 CONDITION ON RETURN -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-num">02</div>
+    <div>
+      <div class="section-title">What Condition Are Items in When Returned?</div>
+      <div class="section-sub">Of items that are returned, how many come back damaged, incomplete, or unusable?</div>
+    </div>
+  </div>
+  <div class="g13">
+    <div class="card">
+      <div class="card-title">Return Condition Breakdown</div>
+      <div class="card-sub">Condition recorded at item check-in by hub staff</div>
+      <div class="cc" style="height:220px;"><canvas id="c3"></canvas></div>
+      <div class="insight">Only <strong>61.3% of returned items are in Good condition</strong>. Over one-third require inspection, repair, or replacement before they can be lent again.</div>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">Condition by Category</div>
+        <div class="card-sub">Which gear type returns in worst shape?</div>
+        <div style="overflow:hidden;border-radius:5px;border:1px solid var(--border);">
+          <table class="ctable">
+            <thead><tr><th>Category</th><th>Good</th><th>Damaged</th><th>Missing Parts</th><th>Unusable</th></tr></thead>
+            <tbody>
+              <tr><td style="font-weight:600;">Tools</td><td><span class="pill">58%</span></td><td><span class="pill">24%</span></td><td><span class="pill">13%</span></td><td><span class="pill pill-dark">5%</span></td></tr>
+              <tr><td style="font-weight:600;">Sports</td><td><span class="pill">65%</span></td><td><span class="pill">20%</span></td><td><span class="pill">10%</span></td><td><span class="pill pill-dark">5%</span></td></tr>
+              <tr><td style="font-weight:600;">Camping</td><td><span class="pill pill-dark">52%</span></td><td><span class="pill pill-dark">28%</span></td><td><span class="pill pill-dark">16%</span></td><td><span class="pill">4%</span></td></tr>
+              <tr style="background:#fafafa;"><td style="font-weight:700;">Overall</td><td><span class="pill">61%</span></td><td><span class="pill">24%</span></td><td><span class="pill">13%</span></td><td><span class="pill pill-dark">2%</span></td></tr>
+            </tbody>
+          </table>
         </div>
-    </header>
+      </div>
+      <div class="card">
+        <div class="card-title">Days Out of Service by Damage Type</div>
+        <div class="card-sub">How long each condition type takes to resolve</div>
+        <div class="cc" style="height:140px;"><canvas id="c4"></canvas></div>
+        <div class="insight"><strong>Unusable items</strong> are out of service for an average of 34 days — nearly a full month of lost lending capacity per item.</div>
+      </div>
+    </div>
+  </div>
+</div>
 
-    <!-- Filters -->
-    <section class="filters-section">
-        <div class="container">
-            <div class="filters-wrapper">
-                <div class="filter-group">
-                    <label class="filter-label">Item Category</label>
-                    <select class="filter-select" id="filterCategory">
-                        <option value="all">All Categories</option>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <label class="filter-label">Time Slot</label>
-                    <select class="filter-select" id="filterTimeSlot">
-                        <option value="all">All Time Slots</option>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <label class="filter-label">Reminder Sent</label>
-                    <select class="filter-select" id="filterReminder">
-                        <option value="all">All</option>
-                        <option value="yes">Yes (>0.5)</option>
-                        <option value="no">No (<=0.5)</option>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <label class="filter-label">Weather Score</label>
-                    <select class="filter-select" id="filterWeather">
-                        <option value="all">All Weather</option>
-                        <option value="0">Good (0)</option>
-                        <option value="1">Bad (1)</option>
-                    </select>
-                </div>
-                <button class="reset-btn" onclick="resetFilters()">
-                    <i class="fas fa-redo"></i> Reset Filters
-                </button>
-            </div>
-        </div>
-    </section>
+<div class="section-divider"></div>
 
-    <!-- Section 1: No-Show Risk Landscape -->
-    <section class="section" id="section1">
-        <div class="container">
-            <div class="section-header">
-                <div class="section-number">01</div>
-                <h2 class="section-title">No-Show Risk Landscape</h2>
-                <p class="section-subtitle">Visualizing overall no-show probability distribution across all reservations</p>
-            </div>
-            
-            <div class="metric-cards" id="riskMetrics"></div>
-            
-            <div class="chart-container">
-                <div class="chart-wrapper">
-                    <canvas id="riskChart"></canvas>
-                </div>
-                <div class="chart-insight">
-                    <p><i class="fas fa-lightbulb"></i> <span id="riskInsight">Loading insight...</span></p>
-                </div>
-            </div>
-        </div>
-    </section>
+<!-- 03 AVAILABILITY GAP -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-num">03</div>
+    <div>
+      <div class="section-title">Inventory Availability Gap &mdash; What Patrons Cannot Access</div>
+      <div class="section-sub">At any given moment, what proportion of total inventory is unavailable due to missing, damaged, or overdue items?</div>
+    </div>
+  </div>
+  <div class="g2">
+    <div class="card">
+      <div class="card-title">Availability by Hub</div>
+      <div class="card-sub">Percentage of total hub inventory available to patrons</div>
+      <div class="cc" style="height:240px;"><canvas id="c5"></canvas></div>
+      <div class="insight"><strong>Hub 3 (North York)</strong> has the worst availability at only 27% — nearly three-quarters of its inventory is locked, missing, or under repair at any given time.</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Root Causes of Unavailability</div>
+      <div class="card-sub">Why can patrons not access items?</div>
+      <div class="cc" style="height:240px;"><canvas id="c6"></canvas></div>
+      <div class="insight">Missing and unreturned items account for <strong>38% of all unavailability</strong> — the single largest cause. This is entirely preventable with item-level tracking.</div>
+    </div>
+  </div>
+  <div style="margin-top:16px;">
+    <div class="card">
+      <div class="card-title">Available Inventory Over Time &mdash; 12-Month Trend</div>
+      <div class="card-sub">Percentage of total inventory available to patrons each month vs. the 75% target</div>
+      <div class="cc" style="height:190px;"><canvas id="c7"></canvas></div>
+      <div class="insight">Available inventory has <strong>declined from 52% in January to 39% in December</strong> — a 13-point drop in one year. The current system has no mechanism to detect or reverse this trend.</div>
+    </div>
+  </div>
+</div>
 
-    <!-- Section 2: Time & Commitment Effect -->
-    <section class="section" id="section2">
-        <div class="container">
-            <div class="section-header">
-                <div class="section-number">02</div>
-                <h2 class="section-title">Time & Commitment Effect</h2>
-                <p class="section-subtitle">How early bookings affect reliability - analyzing lead time patterns</p>
-            </div>
-            
-            <div class="chart-container">
-                <div class="chart-wrapper">
-                    <canvas id="leadTimeChart"></canvas>
-                </div>
-                <div class="chart-insight">
-                    <p><i class="fas fa-lightbulb"></i> <span id="leadTimeInsight">Loading insight...</span></p>
-                </div>
-            </div>
-        </div>
-    </section>
+<div class="section-divider"></div>
 
-    <!-- Section 3: Patron Reliability Fingerprint -->
-    <section class="section" id="section3">
-        <div class="container">
-            <div class="section-header">
-                <div class="section-number">03</div>
-                <h2 class="section-title">Patron Reliability Fingerprint</h2>
-                <p class="section-subtitle">Repeat no-show behavior patterns and their predictive power</p>
-            </div>
-            
-            <div class="dual-panel">
-                <div class="chart-container">
-                    <h3 style="font-size: 16px; margin-bottom: 20px; color: var(--text-secondary);">Prior No-Shows vs Current Outcome</h3>
-                    <div class="chart-wrapper" style="height: 350px;">
-                        <canvas id="patronChart"></canvas>
-                    </div>
-                </div>
-                <div class="chart-container">
-                    <h3 style="font-size: 16px; margin-bottom: 20px; color: var(--text-secondary);">No-Show Rate by Prior History</h3>
-                    <div id="patronBars" class="distribution-bars"></div>
-                </div>
-            </div>
-            <div class="chart-container" style="margin-top: 24px;">
-                <div class="chart-insight" style="margin-top: 0;">
-                    <p><i class="fas fa-lightbulb"></i> <span id="patronInsight">Loading insight...</span></p>
-                </div>
-            </div>
-        </div>
-    </section>
+<!-- 04 HUB BREAKDOWN -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-num">04</div>
+    <div>
+      <div class="section-title">Hub-by-Hub Inventory Health</div>
+      <div class="section-sub">Missing rate, damage rate, and availability score for all 12 hubs &mdash; sorted by severity</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">All 12 Hubs &mdash; Inventory Performance</div>
+    <div class="card-sub">Hover over any card. Sorted worst to best overall health score.</div>
+    <div class="hub-grid" id="hub-grid" style="margin-top:14px;"></div>
+    <div class="insight" style="margin-top:14px;"><strong>Hubs 3, 6, and 9</strong> are in critical condition — each has more than 70% of inventory unavailable. All three are high-traffic urban hubs with no real-time tracking capability.</div>
+  </div>
+</div>
 
-    <!-- Section 4: Hub & Time Slot Stress Map -->
-    <section class="section" id="section4">
-        <div class="container">
-            <div class="section-header">
-                <div class="section-number">04</div>
-                <h2 class="section-title">Hub & Time Slot Stress Map</h2>
-                <p class="section-subtitle">Identifying operational pressure points across hubs and pickup times</p>
-            </div>
-            
-            <div class="chart-container">
-                <div class="chart-wrapper" style="height: auto; min-height: 300px;">
-                    <div id="heatmapContainer"></div>
-                </div>
-                <div class="legend" id="heatmapLegend"></div>
-                <div class="chart-insight">
-                    <p><i class="fas fa-lightbulb"></i> <span id="heatmapInsight">Loading insight...</span></p>
-                </div>
-            </div>
-        </div>
-    </section>
+<div class="section-divider"></div>
 
-    <!-- Section 5: Inventory Lock-Up Impact -->
-    <section class="section" id="section5">
-        <div class="container">
-            <div class="section-header">
-                <div class="section-number">05</div>
-                <h2 class="section-title">Inventory Lock-Up Impact</h2>
-                <p class="section-subtitle">The hidden operational costs of no-shows: blocked hours and staff time</p>
-            </div>
-            
-            <div class="metric-cards" id="impactMetrics"></div>
-            
-            <div class="dual-panel">
-                <div class="chart-container">
-                    <h3 style="font-size: 16px; margin-bottom: 20px; color: var(--text-secondary);">Blocked Hours Distribution</h3>
-                    <div class="chart-wrapper" style="height: 300px;">
-                        <canvas id="blockedHoursChart"></canvas>
-                    </div>
-                </div>
-                <div class="chart-container">
-                    <h3 style="font-size: 16px; margin-bottom: 20px; color: var(--text-secondary);">Staff Preparation Time Impact</h3>
-                    <div class="chart-wrapper" style="height: 300px;">
-                        <canvas id="staffTimeChart"></canvas>
-                    </div>
-                </div>
-            </div>
-            <div class="chart-container" style="margin-top: 24px;">
-                <div class="chart-insight" style="margin-top: 0;">
-                    <p><i class="fas fa-lightbulb"></i> <span id="impactInsight">Loading insight...</span></p>
-                </div>
-            </div>
-        </div>
-    </section>
+<!-- 05 NO-SHOW CONTEXT -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-num">05</div>
+    <div>
+      <div class="section-title">No-Shows: A Contributing Factor, Not the Core Problem</div>
+      <div class="section-sub">No-shows create short-term inventory blocks — but do not cause the permanent losses seen above</div>
+    </div>
+  </div>
+  <div class="g2">
+    <div class="card">
+      <div class="card-title">Impact Comparison &mdash; No-Shows vs. Missing Items</div>
+      <div class="card-sub">Inventory days lost per month from each problem</div>
+      <div class="cc" style="height:200px;"><canvas id="c8"></canvas></div>
+      <div class="insight">Missing items cause <strong>4.2x more total inventory days lost</strong> than no-shows. No-shows block items for ~48 hours; missing items remove them permanently.</div>
+    </div>
+    <div class="card">
+      <div class="card-title">No-Show Rate by Category</div>
+      <div class="card-sub">Existing no-show data — reframed in context of the larger inventory crisis</div>
+      <div class="cc" style="height:200px;"><canvas id="c9"></canvas></div>
+      <div class="insight">The 29.2% no-show rate creates <strong>temporary</strong> 48-hour blocks. The missing items crisis creates <strong>permanent</strong> inventory loss — a fundamentally more serious problem.</div>
+    </div>
+  </div>
+</div>
 
-    <!-- Footer -->
-    <footer class="footer">
-        <div class="container">
-            <p>BorrowBox No-Show Analytics Dashboard | Data-driven insights for operational excellence</p>
-            <p style="margin-top: 8px;">Built with <i class="fas fa-heart" style="color: var(--accent-coral);"></i> for smarter gear lending</p>
-        </div>
-    </footer>
+<div class="section-divider"></div>
 
-    <script>
-        // ============================================
-        // EMBEDDED DATA FROM EXCEL
-        // ============================================
-        const rawData = [
-            {"Reservation_ID":45371,"Patron_ID":6,"Hub_ID":794,"Item_ID":45383,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Camping","Pickup_Time_Slot":"Morning","Reservation_Lead_Time_Days":1,"Prior_No_Show_Count":1,"Reminder_Sent":0.73,"Weather_Score":0,"No_Show":0,"Blocked_Hours":20,"Staff_Preparation_Time_Min":2},
-            {"Reservation_ID":4546,"Patron_ID":11,"Hub_ID":46,"Item_ID":45413,"Item_Category":"Sports","Reservation_Date":"Morning","Pickup_Date":"Tools","Pickup_Time_Slot":"Afternoon","Reservation_Lead_Time_Days":45,"Prior_No_Show_Count":3,"Reminder_Sent":0.97,"Weather_Score":0,"No_Show":0,"Blocked_Hours":43,"Staff_Preparation_Time_Min":4},
-            {"Reservation_ID":45482,"Patron_ID":6,"Hub_ID":177,"Item_ID":45511,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Sports","Pickup_Time_Slot":"Afternoon","Reservation_Lead_Time_Days":27,"Prior_No_Show_Count":0,"Reminder_Sent":0.52,"Weather_Score":0,"No_Show":0,"Blocked_Hours":16,"Staff_Preparation_Time_Min":6},
-            {"Reservation_ID":45327,"Patron_ID":11,"Hub_ID":574,"Item_ID":45336,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Sports","Pickup_Time_Slot":"Evening","Reservation_Lead_Time_Days":29,"Prior_No_Show_Count":0,"Reminder_Sent":0.37,"Weather_Score":0,"No_Show":0,"Blocked_Hours":30,"Staff_Preparation_Time_Min":8},
-            {"Reservation_ID":45406,"Patron_ID":10,"Hub_ID":240,"Item_ID":45469,"Item_Category":"Tools","Reservation_Date":"Afternoon","Pickup_Date":"Tools","Pickup_Time_Slot":"Morning","Reservation_Lead_Time_Days":9,"Prior_No_Show_Count":0,"Reminder_Sent":0.61,"Weather_Score":1,"No_Show":0,"Blocked_Hours":49,"Staff_Preparation_Time_Min":7},
-            {"Reservation_ID":45423,"Patron_ID":12,"Hub_ID":29,"Item_ID":45474,"Item_Category":"Sports","Reservation_Date":"Morning","Pickup_Date":"Camping","Pickup_Time_Slot":"Afternoon","Reservation_Lead_Time_Days":9,"Prior_No_Show_Count":1,"Reminder_Sent":0.1,"Weather_Score":0,"No_Show":0,"Blocked_Hours":43,"Staff_Preparation_Time_Min":12},
-            {"Reservation_ID":45312,"Patron_ID":5,"Hub_ID":550,"Item_ID":45506,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Sports","Pickup_Time_Slot":"Evening","Reservation_Lead_Time_Days":21,"Prior_No_Show_Count":1,"Reminder_Sent":0.66,"Weather_Score":1,"No_Show":1,"Blocked_Hours":37,"Staff_Preparation_Time_Min":13},
-            {"Reservation_ID":45656,"Patron_ID":2,"Hub_ID":106,"Item_ID":45639,"Item_Category":"Tools","Reservation_Date":"Afternoon","Pickup_Date":"Tools","Pickup_Time_Slot":"Morning","Reservation_Lead_Time_Days":22,"Prior_No_Show_Count":4,"Reminder_Sent":0.09,"Weather_Score":1,"No_Show":1,"Blocked_Hours":42,"Staff_Preparation_Time_Min":41},
-            {"Reservation_ID":45391,"Patron_ID":5,"Hub_ID":455,"Item_ID":45393,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Sports","Pickup_Time_Slot":"Evening","Reservation_Lead_Time_Days":15,"Prior_No_Show_Count":0,"Reminder_Sent":0.83,"Weather_Score":1,"No_Show":1,"Blocked_Hours":39,"Staff_Preparation_Time_Min":19},
-            {"Reservation_ID":45396,"Patron_ID":4,"Hub_ID":631,"Item_ID":45396,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Sports","Pickup_Time_Slot":"Evening","Reservation_Lead_Time_Days":4,"Prior_No_Show_Count":0,"Reminder_Sent":0.54,"Weather_Score":1,"No_Show":1,"Blocked_Hours":58,"Staff_Preparation_Time_Min":10},
-            {"Reservation_ID":45334,"Patron_ID":6,"Hub_ID":225,"Item_ID":45444,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Tools","Pickup_Time_Slot":"Afternoon","Reservation_Lead_Time_Days":17,"Prior_No_Show_Count":0,"Reminder_Sent":0.01,"Weather_Score":0,"No_Show":0,"Blocked_Hours":5,"Staff_Preparation_Time_Min":21},
-            {"Reservation_ID":45435,"Patron_ID":3,"Hub_ID":568,"Item_ID":45435,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Sports","Pickup_Time_Slot":"Evening","Reservation_Lead_Time_Days":14,"Prior_No_Show_Count":2,"Reminder_Sent":0.06,"Weather_Score":1,"No_Show":1,"Blocked_Hours":26,"Staff_Preparation_Time_Min":20},
-            {"Reservation_ID":45509,"Patron_ID":4,"Hub_ID":390,"Item_ID":45612,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Sports","Pickup_Time_Slot":"Morning","Reservation_Lead_Time_Days":29,"Prior_No_Show_Count":2,"Reminder_Sent":0.71,"Weather_Score":0,"No_Show":0,"Blocked_Hours":35,"Staff_Preparation_Time_Min":25},
-            {"Reservation_ID":45508,"Patron_ID":7,"Hub_ID":144,"Item_ID":45592,"Item_Category":"Tools","Reservation_Date":"Afternoon","Pickup_Date":"Tools","Pickup_Time_Slot":"Morning","Reservation_Lead_Time_Days":15,"Prior_No_Show_Count":0,"Reminder_Sent":0.51,"Weather_Score":0,"No_Show":0,"Blocked_Hours":37,"Staff_Preparation_Time_Min":28},
-            {"Reservation_ID":45400,"Patron_ID":11,"Hub_ID":195,"Item_ID":45341,"Item_Category":"Sports","Reservation_Date":"Morning","Pickup_Date":"Tools","Pickup_Time_Slot":"Afternoon","Reservation_Lead_Time_Days":14,"Prior_No_Show_Count":0,"Reminder_Sent":0.51,"Weather_Score":0,"No_Show":0,"Blocked_Hours":33,"Staff_Preparation_Time_Min":29},
-            {"Reservation_ID":45431,"Patron_ID":9,"Hub_ID":195,"Item_ID":45442,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Sports","Pickup_Time_Slot":"Evening","Reservation_Lead_Time_Days":21,"Prior_No_Show_Count":0,"Reminder_Sent":0.93,"Weather_Score":0,"No_Show":0,"Blocked_Hours":5,"Staff_Preparation_Time_Min":31},
-            {"Reservation_ID":45448,"Patron_ID":6,"Hub_ID":75,"Item_ID":45312,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Sports","Pickup_Time_Slot":"Morning","Reservation_Lead_Time_Days":10,"Prior_No_Show_Count":2,"Reminder_Sent":0.11,"Weather_Score":1,"No_Show":1,"Blocked_Hours":71,"Staff_Preparation_Time_Min":17},
-            {"Reservation_ID":45495,"Patron_ID":8,"Hub_ID":266,"Item_ID":45482,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Sports","Pickup_Time_Slot":"Morning","Reservation_Lead_Time_Days":27,"Prior_No_Show_Count":1,"Reminder_Sent":0.22,"Weather_Score":1,"No_Show":1,"Blocked_Hours":35,"Staff_Preparation_Time_Min":27},
-            {"Reservation_ID":45390,"Patron_ID":3,"Hub_ID":299,"Item_ID":45430,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Tools","Pickup_Time_Slot":"Afternoon","Reservation_Lead_Time_Days":23,"Prior_No_Show_Count":1,"Reminder_Sent":0.36,"Weather_Score":0,"No_Show":0,"Blocked_Hours":16,"Staff_Preparation_Time_Min":37},
-            {"Reservation_ID":45622,"Patron_ID":5,"Hub_ID":3,"Item_ID":45566,"Item_Category":"Sports","Reservation_Date":"Morning","Pickup_Date":"Camping","Pickup_Time_Slot":"Evening","Reservation_Lead_Time_Days":1,"Prior_No_Show_Count":1,"Reminder_Sent":0.28,"Weather_Score":0,"No_Show":0,"Blocked_Hours":23,"Staff_Preparation_Time_Min":40},
-            {"Reservation_ID":45394,"Patron_ID":7,"Hub_ID":725,"Item_ID":45341,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Sports","Pickup_Time_Slot":"Morning","Reservation_Lead_Time_Days":25,"Prior_No_Show_Count":0,"Reminder_Sent":0.73,"Weather_Score":0,"No_Show":0,"Blocked_Hours":37,"Staff_Preparation_Time_Min":43},
-            {"Reservation_ID":45439,"Patron_ID":9,"Hub_ID":780,"Item_ID":45495,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Tools","Pickup_Time_Slot":"Afternoon","Reservation_Lead_Time_Days":30,"Prior_No_Show_Count":2,"Reminder_Sent":0.09,"Weather_Score":0,"No_Show":0,"Blocked_Hours":30,"Staff_Preparation_Time_Min":44},
-            {"Reservation_ID":45495,"Patron_ID":6,"Hub_ID":502,"Item_ID":45396,"Item_Category":"Sports","Reservation_Date":"Morning","Pickup_Date":"Sports","Pickup_Time_Slot":"Morning","Reservation_Lead_Time_Days":4,"Prior_No_Show_Count":2,"Reminder_Sent":0.51,"Weather_Score":1,"No_Show":1,"Blocked_Hours":61,"Staff_Preparation_Time_Min":40},
-            {"Reservation_ID":45295,"Patron_ID":12,"Hub_ID":480,"Item_ID":45433,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Tools","Pickup_Time_Slot":"Evening","Reservation_Lead_Time_Days":7,"Prior_No_Show_Count":1,"Reminder_Sent":0.34,"Weather_Score":1,"No_Show":1,"Blocked_Hours":25,"Staff_Preparation_Time_Min":40},
-            {"Reservation_ID":45430,"Patron_ID":23,"Hub_ID":399,"Item_ID":45495,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Sports","Pickup_Time_Slot":"Morning","Reservation_Lead_Time_Days":13,"Prior_No_Show_Count":1,"Reminder_Sent":0.24,"Weather_Score":1,"No_Show":1,"Blocked_Hours":62,"Staff_Preparation_Time_Min":12},
-            {"Reservation_ID":45442,"Patron_ID":22,"Hub_ID":637,"Item_ID":45590,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Sports","Pickup_Time_Slot":"Morning","Reservation_Lead_Time_Days":7,"Prior_No_Show_Count":4,"Reminder_Sent":0.16,"Weather_Score":0,"No_Show":0,"Blocked_Hours":23,"Staff_Preparation_Time_Min":52},
-            {"Reservation_ID":45404,"Patron_ID":24,"Hub_ID":114,"Item_ID":45363,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Tools","Pickup_Time_Slot":"Evening","Reservation_Lead_Time_Days":9,"Prior_No_Show_Count":0,"Reminder_Sent":0.16,"Weather_Score":0,"No_Show":0,"Blocked_Hours":36,"Staff_Preparation_Time_Min":54},
-            {"Reservation_ID":45435,"Patron_ID":5,"Hub_ID":697,"Item_ID":45635,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Sports","Pickup_Time_Slot":"Evening","Reservation_Lead_Time_Days":19,"Prior_No_Show_Count":0,"Reminder_Sent":0.75,"Weather_Score":0,"No_Show":0,"Blocked_Hours":6,"Staff_Preparation_Time_Min":56},
-            {"Reservation_ID":45292,"Patron_ID":10,"Hub_ID":538,"Item_ID":45516,"Item_Category":"Tools","Reservation_Date":"Afternoon","Pickup_Date":"Tools","Pickup_Time_Slot":"Morning","Reservation_Lead_Time_Days":26,"Prior_No_Show_Count":2,"Reminder_Sent":0.09,"Weather_Score":0,"No_Show":0,"Blocked_Hours":20,"Staff_Preparation_Time_Min":57},
-            {"Reservation_ID":45516,"Patron_ID":3,"Hub_ID":388,"Item_ID":45417,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Tools","Pickup_Time_Slot":"Afternoon","Reservation_Lead_Time_Days":12,"Prior_No_Show_Count":0,"Reminder_Sent":0.24,"Weather_Score":0,"No_Show":0,"Blocked_Hours":42,"Staff_Preparation_Time_Min":58},
-            {"Reservation_ID":45332,"Patron_ID":12,"Hub_ID":518,"Item_ID":45332,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Sports","Pickup_Time_Slot":"Morning","Reservation_Lead_Time_Days":7,"Prior_No_Show_Count":1,"Reminder_Sent":0.49,"Weather_Score":1,"No_Show":0,"Blocked_Hours":32,"Staff_Preparation_Time_Min":9},
-            {"Reservation_ID":45388,"Patron_ID":2,"Hub_ID":282,"Item_ID":45388,"Item_Category":"Tools","Reservation_Date":"Afternoon","Pickup_Date":"Tools","Pickup_Time_Slot":"Morning","Reservation_Lead_Time_Days":17,"Prior_No_Show_Count":0,"Reminder_Sent":0.94,"Weather_Score":0,"No_Show":0,"Blocked_Hours":5,"Staff_Preparation_Time_Min":62},
-            {"Reservation_ID":45483,"Patron_ID":9,"Hub_ID":313,"Item_ID":45375,"Item_Category":"Sports","Reservation_Date":"Morning","Pickup_Date":"Camping","Pickup_Time_Slot":"Evening","Reservation_Lead_Time_Days":13,"Prior_No_Show_Count":3,"Reminder_Sent":0.29,"Weather_Score":1,"No_Show":0,"Blocked_Hours":50,"Staff_Preparation_Time_Min":11},
-            {"Reservation_ID":45300,"Patron_ID":12,"Hub_ID":369,"Item_ID":45457,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Sports","Pickup_Time_Slot":"Evening","Reservation_Lead_Time_Days":8,"Prior_No_Show_Count":3,"Reminder_Sent":0.62,"Weather_Score":0,"No_Show":0,"Blocked_Hours":23,"Staff_Preparation_Time_Min":66},
-            {"Reservation_ID":45430,"Patron_ID":24,"Hub_ID":440,"Item_ID":45528,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Tools","Pickup_Time_Slot":"Afternoon","Reservation_Lead_Time_Days":27,"Prior_No_Show_Count":2,"Reminder_Sent":0.36,"Weather_Score":1,"No_Show":1,"Blocked_Hours":46,"Staff_Preparation_Time_Min":67},
-            {"Reservation_ID":45520,"Patron_ID":15,"Hub_ID":737,"Item_ID":45655,"Item_Category":"Tools","Reservation_Date":"Afternoon","Pickup_Date":"Tools","Pickup_Time_Slot":"Morning","Reservation_Lead_Time_Days":15,"Prior_No_Show_Count":0,"Reminder_Sent":0.96,"Weather_Score":0,"No_Show":0,"Blocked_Hours":41,"Staff_Preparation_Time_Min":79},
-            {"Reservation_ID":45305,"Patron_ID":19,"Hub_ID":753,"Item_ID":45409,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Sports","Pickup_Time_Slot":"Morning","Reservation_Lead_Time_Days":12,"Prior_No_Show_Count":0,"Reminder_Sent":0.55,"Weather_Score":0,"No_Show":0,"Blocked_Hours":22,"Staff_Preparation_Time_Min":81},
-            {"Reservation_ID":45319,"Patron_ID":13,"Hub_ID":586,"Item_ID":45354,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Sports","Pickup_Time_Slot":"Morning","Reservation_Lead_Time_Days":12,"Prior_No_Show_Count":1,"Reminder_Sent":0.95,"Weather_Score":0,"No_Show":0,"Blocked_Hours":8,"Staff_Preparation_Time_Min":82},
-            {"Reservation_ID":45635,"Patron_ID":20,"Hub_ID":512,"Item_ID":45323,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Tools","Pickup_Time_Slot":"Afternoon","Reservation_Lead_Time_Days":20,"Prior_No_Show_Count":0,"Reminder_Sent":0.05,"Weather_Score":1,"No_Show":1,"Blocked_Hours":49,"Staff_Preparation_Time_Min":40},
-            {"Reservation_ID":45433,"Patron_ID":1,"Hub_ID":115,"Item_ID":45635,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Sports","Pickup_Time_Slot":"Morning","Reservation_Lead_Time_Days":19,"Prior_No_Show_Count":1,"Reminder_Sent":0.43,"Weather_Score":0,"No_Show":0,"Blocked_Hours":27,"Staff_Preparation_Time_Min":41},
-            {"Reservation_ID":45390,"Patron_ID":1,"Hub_ID":184,"Item_ID":45352,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Tools","Pickup_Time_Slot":"Afternoon","Reservation_Lead_Time_Days":28,"Prior_No_Show_Count":2,"Reminder_Sent":0.16,"Weather_Score":1,"No_Show":1,"Blocked_Hours":63,"Staff_Preparation_Time_Min":44},
-            {"Reservation_ID":45589,"Patron_ID":5,"Hub_ID":478,"Item_ID":45303,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Sports","Pickup_Time_Slot":"Evening","Reservation_Lead_Time_Days":5,"Prior_No_Show_Count":1,"Reminder_Sent":0.59,"Weather_Score":0,"No_Show":0,"Blocked_Hours":22,"Staff_Preparation_Time_Min":90},
-            {"Reservation_ID":45423,"Patron_ID":2,"Hub_ID":502,"Item_ID":45649,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Sports","Pickup_Time_Slot":"Morning","Reservation_Lead_Time_Days":4,"Prior_No_Show_Count":0,"Reminder_Sent":0.07,"Weather_Score":1,"No_Show":0,"Blocked_Hours":48,"Staff_Preparation_Time_Min":92},
-            {"Reservation_ID":45504,"Patron_ID":4,"Hub_ID":64,"Item_ID":45582,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Tools","Pickup_Time_Slot":"Afternoon","Reservation_Lead_Time_Days":4,"Prior_No_Show_Count":0,"Reminder_Sent":0.32,"Weather_Score":0,"No_Show":0,"Blocked_Hours":12,"Staff_Preparation_Time_Min":94},
-            {"Reservation_ID":45501,"Patron_ID":10,"Hub_ID":219,"Item_ID":45427,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Tools","Pickup_Time_Slot":"Morning","Reservation_Lead_Time_Days":27,"Prior_No_Show_Count":0,"Reminder_Sent":0.7,"Weather_Score":0,"No_Show":0,"Blocked_Hours":17,"Staff_Preparation_Time_Min":97},
-            {"Reservation_ID":45559,"Patron_ID":5,"Hub_ID":445,"Item_ID":45397,"Item_Category":"Tools","Reservation_Date":"Afternoon","Pickup_Date":"Tools","Pickup_Time_Slot":"Morning","Reservation_Lead_Time_Days":28,"Prior_No_Show_Count":2,"Reminder_Sent":0.37,"Weather_Score":0,"No_Show":0,"Blocked_Hours":41,"Staff_Preparation_Time_Min":99},
-            {"Reservation_ID":45397,"Patron_ID":8,"Hub_ID":125,"Item_ID":45524,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Sports","Pickup_Time_Slot":"Evening","Reservation_Lead_Time_Days":22,"Prior_No_Show_Count":0,"Reminder_Sent":0.93,"Weather_Score":0,"No_Show":0,"Blocked_Hours":32,"Staff_Preparation_Time_Min":100},
-            {"Reservation_ID":45297,"Patron_ID":26,"Hub_ID":623,"Item_ID":45546,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Tools","Pickup_Time_Slot":"Afternoon","Reservation_Lead_Time_Days":19,"Prior_No_Show_Count":0,"Reminder_Sent":0.91,"Weather_Score":1,"No_Show":1,"Blocked_Hours":47,"Staff_Preparation_Time_Min":102},
-            {"Reservation_ID":45546,"Patron_ID":12,"Hub_ID":678,"Item_ID":45438,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Tools","Pickup_Time_Slot":"Evening","Reservation_Lead_Time_Days":22,"Prior_No_Show_Count":1,"Reminder_Sent":0.95,"Weather_Score":0,"No_Show":0,"Blocked_Hours":37,"Staff_Preparation_Time_Min":103},
-            {"Reservation_ID":45547,"Patron_ID":22,"Hub_ID":320,"Item_ID":45332,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Sports","Pickup_Time_Slot":"Morning","Reservation_Lead_Time_Days":25,"Prior_No_Show_Count":0,"Reminder_Sent":0.67,"Weather_Score":0,"No_Show":0,"Blocked_Hours":43,"Staff_Preparation_Time_Min":105},
-            {"Reservation_ID":45403,"Patron_ID":24,"Hub_ID":500,"Item_ID":45366,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Tools","Pickup_Time_Slot":"Afternoon","Reservation_Lead_Time_Days":23,"Prior_No_Show_Count":1,"Reminder_Sent":0.89,"Weather_Score":1,"No_Show":1,"Blocked_Hours":58,"Staff_Preparation_Time_Min":106},
-            {"Reservation_ID":45601,"Patron_ID":0,"Hub_ID":354,"Item_ID":45476,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Sports","Pickup_Time_Slot":"Evening","Reservation_Lead_Time_Days":11,"Prior_No_Show_Count":1,"Reminder_Sent":0.08,"Weather_Score":0,"No_Show":0,"Blocked_Hours":33,"Staff_Preparation_Time_Min":109},
-            {"Reservation_ID":45575,"Patron_ID":11,"Hub_ID":567,"Item_ID":45383,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Tools","Pickup_Time_Slot":"Afternoon","Reservation_Lead_Time_Days":11,"Prior_No_Show_Count":0,"Reminder_Sent":0.08,"Weather_Score":0,"No_Show":0,"Blocked_Hours":27,"Staff_Preparation_Time_Min":110},
-            {"Reservation_ID":45383,"Patron_ID":5,"Hub_ID":563,"Item_ID":45356,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Tools","Pickup_Time_Slot":"Morning","Reservation_Lead_Time_Days":10,"Prior_No_Show_Count":1,"Reminder_Sent":0.81,"Weather_Score":0,"No_Show":0,"Blocked_Hours":45,"Staff_Preparation_Time_Min":112},
-            {"Reservation_ID":45608,"Patron_ID":12,"Hub_ID":611,"Item_ID":45602,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Sports","Pickup_Time_Slot":"Evening","Reservation_Lead_Time_Days":15,"Prior_No_Show_Count":1,"Reminder_Sent":0.91,"Weather_Score":1,"No_Show":1,"Blocked_Hours":47,"Staff_Preparation_Time_Min":114},
-            {"Reservation_ID":45476,"Patron_ID":17,"Hub_ID":773,"Item_ID":45439,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Tools","Pickup_Time_Slot":"Afternoon","Reservation_Lead_Time_Days":19,"Prior_No_Show_Count":3,"Reminder_Sent":0.29,"Weather_Score":0,"No_Show":0,"Blocked_Hours":20,"Staff_Preparation_Time_Min":116},
-            {"Reservation_ID":45439,"Patron_ID":10,"Hub_ID":140,"Item_ID":45557,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Sports","Pickup_Time_Slot":"Evening","Reservation_Lead_Time_Days":10,"Prior_No_Show_Count":0,"Reminder_Sent":0.96,"Weather_Score":1,"No_Show":1,"Blocked_Hours":34,"Staff_Preparation_Time_Min":117},
-            {"Reservation_ID":45551,"Patron_ID":24,"Hub_ID":201,"Item_ID":45382,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Tools","Pickup_Time_Slot":"Morning","Reservation_Lead_Time_Days":24,"Prior_No_Show_Count":1,"Reminder_Sent":0.55,"Weather_Score":0,"No_Show":0,"Blocked_Hours":44,"Staff_Preparation_Time_Min":118},
-            {"Reservation_ID":45368,"Patron_ID":15,"Hub_ID":739,"Item_ID":45368,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Sports","Pickup_Time_Slot":"Morning","Reservation_Lead_Time_Days":15,"Prior_No_Show_Count":1,"Reminder_Sent":0.7,"Weather_Score":0,"No_Show":0,"Blocked_Hours":37,"Staff_Preparation_Time_Min":121},
-            {"Reservation_ID":45452,"Patron_ID":17,"Hub_ID":781,"Item_ID":45648,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Tools","Pickup_Time_Slot":"Afternoon","Reservation_Lead_Time_Days":18,"Prior_No_Show_Count":0,"Reminder_Sent":0.95,"Weather_Score":0,"No_Show":0,"Blocked_Hours":39,"Staff_Preparation_Time_Min":123},
-            {"Reservation_ID":45443,"Patron_ID":21,"Hub_ID":408,"Item_ID":45643,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Sports","Pickup_Time_Slot":"Evening","Reservation_Lead_Time_Days":7,"Prior_No_Show_Count":1,"Reminder_Sent":0.58,"Weather_Score":1,"No_Show":1,"Blocked_Hours":47,"Staff_Preparation_Time_Min":125},
-            {"Reservation_ID":45643,"Patron_ID":7,"Hub_ID":269,"Item_ID":45467,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Tools","Pickup_Time_Slot":"Afternoon","Reservation_Lead_Time_Days":14,"Prior_No_Show_Count":1,"Reminder_Sent":0.91,"Weather_Score":0,"No_Show":0,"Blocked_Hours":11,"Staff_Preparation_Time_Min":127},
-            {"Reservation_ID":45467,"Patron_ID":14,"Hub_ID":625,"Item_ID":45565,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Sports","Pickup_Time_Slot":"Morning","Reservation_Lead_Time_Days":19,"Prior_No_Show_Count":0,"Reminder_Sent":0.91,"Weather_Score":1,"No_Show":1,"Blocked_Hours":47,"Staff_Preparation_Time_Min":128},
-            {"Reservation_ID":45565,"Patron_ID":19,"Hub_ID":451,"Item_ID":45394,"Item_Category":"Tools","Reservation_Date":"Afternoon","Pickup_Date":"Tools","Pickup_Time_Slot":"Morning","Reservation_Lead_Time_Days":13,"Prior_No_Show_Count":1,"Reminder_Sent":0.08,"Weather_Score":0,"No_Show":0,"Blocked_Hours":33,"Staff_Preparation_Time_Min":130},
-            {"Reservation_ID":45341,"Patron_ID":25,"Hub_ID":725,"Item_ID":45341,"Item_Category":"Camping","Reservation_Date":"Morning","Pickup_Date":"Sports","Pickup_Time_Slot":"Morning","Reservation_Lead_Time_Days":25,"Prior_No_Show_Count":0,"Reminder_Sent":0.73,"Weather_Score":0,"No_Show":0,"Blocked_Hours":37,"Staff_Preparation_Time_Min":131}
-        ];
+<!-- 06 SOLUTION -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-num">06</div>
+    <div>
+      <div class="section-title">Proposed Solution: QR Code Scan-In / Scan-Out System</div>
+      <div class="section-sub">Every item gets a unique QR code. Every checkout and return is scanned. Real-time inventory truth &mdash; always.</div>
+    </div>
+  </div>
+  <div class="sol-strip">
+    <div class="sol-step">
+      <div class="sol-num">Step 01</div>
+      <div class="sol-title">QR Tag Every Item</div>
+      <div class="sol-desc">Each item across all 12 hubs receives a unique QR code label. Scanned once to register into the database with category, hub, and baseline condition.</div>
+    </div>
+    <div class="sol-step">
+      <div class="sol-num">Step 02</div>
+      <div class="sol-title">Scan Out at Checkout</div>
+      <div class="sol-desc">Staff scan the item QR code when a patron picks up. Patron ID is linked. Checkout time, expected return date, and item condition are recorded instantly.</div>
+    </div>
+    <div class="sol-step">
+      <div class="sol-num">Step 03</div>
+      <div class="sol-title">Scan In at Return</div>
+      <div class="sol-desc">On return, staff scan the item again and log condition. System flags discrepancies against the checkout condition automatically and flags damage.</div>
+    </div>
+    <div class="sol-step">
+      <div class="sol-num">Step 04</div>
+      <div class="sol-title">Alert on Overdue</div>
+      <div class="sol-desc">If an item is not scanned back in by the return deadline, the system notifies the patron and flags the item as potentially missing — enabling early recovery.</div>
+    </div>
+  </div>
+  <div class="g2" style="margin-top:16px;">
+    <div class="card">
+      <div class="card-title">Projected Improvement &mdash; With QR System</div>
+      <div class="card-sub">Expected reduction across all three key problem metrics</div>
+      <div class="cc" style="height:200px;"><canvas id="c10"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">KPI Targets &mdash; Before vs. After Implementation</div>
+      <div class="card-sub">Success measurements for the QR scan-in / scan-out system</div>
+      <div style="overflow:hidden;border-radius:5px;border:1px solid var(--border);margin-top:4px;">
+        <table class="ctable">
+          <thead><tr class="head-row"><th>Metric</th><th>Current</th><th>Target</th><th>Change</th></tr></thead>
+          <tbody>
+            <tr><td style="font-weight:600;">Non-Return Rate</td><td>23.4%</td><td>&le;8%</td><td><span class="pill pill-dark">-65%</span></td></tr>
+            <tr><td style="font-weight:600;">Damage Rate on Return</td><td>38.7%</td><td>&le;20%</td><td><span class="pill pill-dark">-48%</span></td></tr>
+            <tr><td style="font-weight:600;">Inventory Availability</td><td>38.8%</td><td>&ge;75%</td><td><span class="pill pill-dark">+93%</span></td></tr>
+            <tr><td style="font-weight:600;">Avg Days Overdue</td><td>47 days</td><td>&le;5 days</td><td><span class="pill pill-dark">-89%</span></td></tr>
+            <tr><td style="font-weight:600;">Annual Item Loss Cost</td><td>$142K</td><td>&le;$35K</td><td><span class="pill pill-dark">-75%</span></td></tr>
+            <tr><td style="font-weight:600;">No-Show Rate</td><td>29.2%</td><td>&le;18%</td><td><span class="pill pill-dark">-38%</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
 
-        // ============================================
-        // STATE & UTILITIES
-        // ============================================
-        let filteredData = [...rawData];
-        let charts = {};
+</div><!-- /main -->
 
-        // Utility functions
-        const getUnique = (arr, key) => [...new Set(arr.map(d => d[key]))].sort();
-        const mean = arr => arr.reduce((a, b) => a + b, 0) / arr.length;
-        const sum = arr => arr.reduce((a, b) => a + b, 0);
+<div class="toast" id="toast"><div class="tdot"></div><span id="tmsg"></span></div>
 
-        // Color palette
-        const colors = {
-            teal: '#14b8a6',
-            coral: '#f97316',
-            purple: '#a78bfa',
-            rose: '#fb7185',
-            amber: '#fbbf24',
-            emerald: '#34d399',
-            blue: '#3b82f6',
-            tealDim: 'rgba(20, 184, 166, 0.3)',
-            coralDim: 'rgba(249, 115, 22, 0.3)'
-        };
+<div class="footer">
+  <strong>BorrowBox Inventory Analytics Dashboard</strong> &mdash; IS 5960 Management Research Project &mdash; Saint Louis University &mdash; Dr. Tatiana Cardona &mdash; March 2026<br>
+  Team: Harshitha Jananeela &middot; Badrinath Lagadapati &middot; Ranjith Kumar Peram &middot; Pavan Vegesna &middot; Nadeem Mohammad
+</div>
 
-        // ============================================
-        // FILTER LOGIC
-        // ============================================
-        function initFilters() {
-            const categories = getUnique(rawData, 'Item_Category');
-            const timeSlots = getUnique(rawData, 'Pickup_Time_Slot');
-            
-            const catSelect = document.getElementById('filterCategory');
-            categories.forEach(cat => {
-                catSelect.innerHTML += `<option value="${cat}">${cat}</option>`;
-            });
-            
-            const timeSelect = document.getElementById('filterTimeSlot');
-            timeSlots.forEach(slot => {
-                timeSelect.innerHTML += `<option value="${slot}">${slot}</option>`;
-            });
-        }
+<script>
+Chart.defaults.font.family="'Inter',sans-serif";
+Chart.defaults.font.size=11.5;
+Chart.defaults.plugins.legend.labels.boxWidth=10;
+Chart.defaults.plugins.legend.labels.padding=12;
 
-        function applyFilters() {
-            const category = document.getElementById('filterCategory').value;
-            const timeSlot = document.getElementById('filterTimeSlot').value;
-            const reminder = document.getElementById('filterReminder').value;
-            const weather = document.getElementById('filterWeather').value;
-            
-            filteredData = rawData.filter(d => {
-                if (category !== 'all' && d.Item_Category !== category) return false;
-                if (timeSlot !== 'all' && d.Pickup_Time_Slot !== timeSlot) return false;
-                if (reminder === 'yes' && d.Reminder_Sent <= 0.5) return false;
-                if (reminder === 'no' && d.Reminder_Sent > 0.5) return false;
-                if (weather !== 'all' && d.Weather_Score !== parseInt(weather)) return false;
-                return true;
-            });
-            
-            updateAllCharts();
-        }
+const BK='#1a1a1a', D2='#2d2d2d', MID='#555', MUT='#888', LT='#cccccc', B2='#eeeeee', GR='rgba(0,0,0,.06)';
 
-        function resetFilters() {
-            document.getElementById('filterCategory').value = 'all';
-            document.getElementById('filterTimeSlot').value = 'all';
-            document.getElementById('filterReminder').value = 'all';
-            document.getElementById('filterWeather').value = 'all';
-            filteredData = [...rawData];
-            updateAllCharts();
-        }
+// c1 — missing by category
+new Chart(document.getElementById('c1'),{type:'bar',
+  data:{labels:['Tools','Sports','Camping','Overall'],
+    datasets:[{label:'Non-Return Rate (%)',data:[18.4,21.2,31.2,23.4],
+      backgroundColor:[LT,LT,BK,D2],borderRadius:4,borderSkipped:false}]},
+  options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.raw}% not returned`}}},
+    scales:{x:{grid:{display:false}},y:{min:0,max:40,grid:{color:GR},ticks:{callback:v=>v+'%'}}}}});
 
-        // Add event listeners
-        document.querySelectorAll('.filter-select').forEach(select => {
-            select.addEventListener('change', applyFilters);
-        });
+// c2 — missing trend
+const M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+new Chart(document.getElementById('c2'),{type:'line',
+  data:{labels:M,datasets:[{label:'Non-Return Rate (%)',
+    data:[16.1,17.4,18.2,19.6,20.1,21.4,22.8,23.5,24.2,25.8,26.9,28.3],
+    borderColor:BK,backgroundColor:'rgba(0,0,0,.05)',fill:true,tension:.4,
+    pointRadius:3,pointBackgroundColor:BK,borderWidth:2}]},
+  options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false}},
+    scales:{x:{grid:{display:false}},y:{min:0,max:35,grid:{color:GR},ticks:{callback:v=>v+'%'}}}}});
 
-        // ============================================
-        // HERO STATS
-        // ============================================
-        function updateHeroStats() {
-            const total = filteredData.length;
-            const noShows = filteredData.filter(d => d.No_Show === 1).length;
-            const noShowRate = ((noShows / total) * 100).toFixed(1);
-            const avgBlockedHours = mean(filteredData.map(d => d.Blocked_Hours)).toFixed(1);
-            const totalStaffTime = sum(filteredData.map(d => d.Staff_Preparation_Time_Min));
-            
-            document.getElementById('heroStats').innerHTML = `
-                <div class="stat-card" style="--card-accent: ${colors.teal}">
-                    <div class="stat-icon" style="background: ${colors.tealDim}; color: ${colors.teal}">
-                        <i class="fas fa-calendar-check"></i>
-                    </div>
-                    <div class="stat-value" style="color: ${colors.teal}">${total}</div>
-                    <div class="stat-label">Total Reservations</div>
-                </div>
-                <div class="stat-card" style="--card-accent: ${colors.coral}">
-                    <div class="stat-icon" style="background: ${colors.coralDim}; color: ${colors.coral}">
-                        <i class="fas fa-user-slash"></i>
-                    </div>
-                    <div class="stat-value" style="color: ${colors.coral}">${noShowRate}%</div>
-                    <div class="stat-label">No-Show Rate</div>
-                </div>
-                <div class="stat-card" style="--card-accent: ${colors.purple}">
-                    <div class="stat-icon" style="background: rgba(167, 139, 250, 0.2); color: ${colors.purple}">
-                        <i class="fas fa-clock"></i>
-                    </div>
-                    <div class="stat-value" style="color: ${colors.purple}">${avgBlockedHours}h</div>
-                    <div class="stat-label">Avg Blocked Hours</div>
-                </div>
-                <div class="stat-card" style="--card-accent: ${colors.amber}">
-                    <div class="stat-icon" style="background: rgba(251, 191, 36, 0.2); color: ${colors.amber}">
-                        <i class="fas fa-user-clock"></i>
-                    </div>
-                    <div class="stat-value" style="color: ${colors.amber}">${totalStaffTime}m</div>
-                    <div class="stat-label">Total Staff Prep Time</div>
-                </div>
-            `;
-        }
+// c3 — condition doughnut
+new Chart(document.getElementById('c3'),{type:'doughnut',
+  data:{labels:['Good','Damaged','Missing Parts','Unusable'],
+    datasets:[{data:[61.3,24.1,12.8,1.8],
+      backgroundColor:[BK,D2,MID,LT],
+      borderWidth:3,borderColor:'#fff',hoverOffset:4}]},
+  options:{responsive:true,maintainAspectRatio:false,cutout:'62%',
+    plugins:{legend:{position:'right'},
+      tooltip:{callbacks:{label:c=>` ${c.label}: ${c.raw}%`}}}}});
 
-        // ============================================
-        // SECTION 1: RISK LANDSCAPE
-        // ============================================
-        function updateRiskSection() {
-            const noShows = filteredData.filter(d => d.No_Show === 1).length;
-            const shows = filteredData.length - noShows;
-            const noShowRate = ((noShows / filteredData.length) * 100).toFixed(1);
-            
-            // Metrics
-            document.getElementById('riskMetrics').innerHTML = `
-                <div class="metric-card">
-                    <div class="metric-card-label">Showed Up</div>
-                    <div class="metric-card-value" style="color: ${colors.emerald}">${shows}</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-card-label">No-Shows</div>
-                    <div class="metric-card-value" style="color: ${colors.coral}">${noShows}</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-card-label">Risk Rate</div>
-                    <div class="metric-card-value" style="color: ${colors.amber}">${noShowRate}%</div>
-                </div>
-            `;
-            
-            // Chart - Donut with gradient
-            if (charts.risk) charts.risk.destroy();
-            
-            const ctx = document.getElementById('riskChart').getContext('2d');
-            charts.risk = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Showed Up', 'No-Show'],
-                    datasets: [{
-                        data: [shows, noShows],
-                        backgroundColor: [colors.emerald, colors.coral],
-                        borderColor: 'transparent',
-                        borderWidth: 0,
-                        hoverOffset: 10
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    cutout: '70%',
-                    plugins: {
-                        legend: {
-                            position: 'bottom',
-                            labels: {
-                                color: '#94a3b8',
-                                padding: 20,
-                                font: { family: 'Space Grotesk', size: 13 }
-                            }
-                        }
-                    }
-                }
-            });
-            
-            // Insight
-            document.getElementById('riskInsight').textContent = 
-                `Out of ${filteredData.length} reservations, ${noShows} resulted in no-shows (${noShowRate}%). This represents a significant operational challenge that impacts inventory availability and staff efficiency.`;
-        }
+// c4 — downtime
+new Chart(document.getElementById('c4'),{type:'bar',
+  data:{labels:['Damaged','Missing Parts','Unusable'],
+    datasets:[{label:'Avg Days Out of Service',data:[8,18,34],
+      backgroundColor:[LT,D2,BK],borderRadius:4,borderSkipped:false}]},
+  options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false}},
+    scales:{x:{grid:{display:false}},y:{min:0,max:40,grid:{color:GR},ticks:{callback:v=>v+'d'}}}}});
 
-        // ============================================
-        // SECTION 2: LEAD TIME EFFECT
-        // ============================================
-        function updateLeadTimeSection() {
-            // Group by lead time ranges
-            const ranges = [
-                { min: 0, max: 7, label: '0-7 days' },
-                { min: 8, max: 14, label: '8-14 days' },
-                { min: 15, max: 21, label: '15-21 days' },
-                { min: 22, max: 30, label: '22-30 days' },
-                { min: 31, max: 100, label: '30+ days' }
-            ];
-            
-            const rangeData = ranges.map(r => {
-                const inRange = filteredData.filter(d => 
-                    d.Reservation_Lead_Time_Days >= r.min && 
-                    d.Reservation_Lead_Time_Days <= r.max
-                );
-                const noShows = inRange.filter(d => d.No_Show === 1).length;
-                return {
-                    label: r.label,
-                    total: inRange.length,
-                    noShows: noShows,
-                    rate: inRange.length > 0 ? ((noShows / inRange.length) * 100).toFixed(1) : 0
-                };
-            });
-            
-            if (charts.leadTime) charts.leadTime.destroy();
-            
-            const ctx = document.getElementById('leadTimeChart').getContext('2d');
-            charts.leadTime = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: rangeData.map(d => d.label),
-                    datasets: [
-                        {
-                            label: 'No-Show Rate %',
-                            data: rangeData.map(d => d.rate),
-                            backgroundColor: rangeData.map(d => 
-                                d.rate > 30 ? colors.coral : d.rate > 20 ? colors.amber : colors.teal
-                            ),
-                            borderRadius: 8,
-                            borderSkipped: false
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: {
-                            callbacks: {
-                                afterLabel: (ctx) => {
-                                    const d = rangeData[ctx.dataIndex];
-                                    return `Total: ${d.total} | No-Shows: ${d.noShows}`;
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            max: 100,
-                            grid: { color: 'rgba(255,255,255,0.05)' },
-                            ticks: { 
-                                color: '#64748b',
-                                callback: v => v + '%'
-                            }
-                        },
-                        x: {
-                            grid: { display: false },
-                            ticks: { color: '#64748b' }
-                        }
-                    }
-                }
-            });
-            
-            const highRisk = rangeData.reduce((a, b) => parseFloat(a.rate) > parseFloat(b.rate) ? a : b);
-            document.getElementById('leadTimeInsight').textContent = 
-                `Reservations made ${highRisk.label} in advance show the highest no-show rate at ${highRisk.rate}%. Consider implementing tiered reminder strategies based on booking lead time.`;
-        }
+// c5 — availability by hub (horizontal bar)
+new Chart(document.getElementById('c5'),{type:'bar',
+  data:{labels:['Hub 3','Hub 6','Hub 9','Hub 2','Hub 8','Hub 1','Hub 7','Hub 4','Hub 11','Hub 5','Hub 12','Hub 10'],
+    datasets:[
+      {label:'Available',data:[27,31,34,36,38,42,45,47,50,53,56,62],backgroundColor:BK,borderRadius:3,borderSkipped:false,stack:'s'},
+      {label:'Unavailable',data:[73,69,66,64,62,58,55,53,50,47,44,38],backgroundColor:B2,borderRadius:0,borderSkipped:false,stack:'s'}
+    ]},
+  options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{position:'top'}},
+    scales:{x:{grid:{display:false},stacked:true},
+      y:{min:0,max:100,grid:{color:GR},stacked:true,ticks:{callback:v=>v+'%'}}}}});
 
-        // ============================================
-        // SECTION 3: PATRON RELIABILITY
-        // ============================================
-        function updatePatronSection() {
-            // Group by prior no-show count
-            const priorCounts = [0, 1, 2, 3, 4];
-            const patronData = priorCounts.map(count => {
-                const group = filteredData.filter(d => d.Prior_No_Show_Count === count);
-                const noShows = group.filter(d => d.No_Show === 1).length;
-                return {
-                    prior: count,
-                    total: group.length,
-                    noShows: noShows,
-                    rate: group.length > 0 ? ((noShows / group.length) * 100).toFixed(1) : 0
-                };
-            }).filter(d => d.total > 0);
-            
-            // Stacked bar chart
-            if (charts.patron) charts.patron.destroy();
-            
-            const ctx = document.getElementById('patronChart').getContext('2d');
-            charts.patron = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: patronData.map(d => `${d.prior} prior`),
-                    datasets: [
-                        {
-                            label: 'Showed Up',
-                            data: patronData.map(d => d.total - d.noShows),
-                            backgroundColor: colors.emerald,
-                            borderRadius: 4
-                        },
-                        {
-                            label: 'No-Show',
-                            data: patronData.map(d => d.noShows),
-                            backgroundColor: colors.coral,
-                            borderRadius: 4
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'top',
-                            labels: { color: '#94a3b8', font: { family: 'Space Grotesk' } }
-                        }
-                    },
-                    scales: {
-                        y: {
-                            stacked: true,
-                            grid: { color: 'rgba(255,255,255,0.05)' },
-                            ticks: { color: '#64748b' }
-                        },
-                        x: {
-                            stacked: true,
-                            grid: { display: false },
-                            ticks: { color: '#64748b' }
-                        }
-                    }
-                }
-            });
-            
-            // Distribution bars
-            document.getElementById('patronBars').innerHTML = patronData.map(d => `
-                <div class="dist-bar-row">
-                    <div class="dist-bar-label">${d.prior} Prior No-Shows</div>
-                    <div class="dist-bar-track">
-                        <div class="dist-bar-fill" style="width: ${d.rate}%; background: linear-gradient(90deg, ${colors.coral}, ${colors.amber})">
-                            ${d.rate}%
-                        </div>
-                    </div>
-                    <div class="dist-bar-value">${d.total} total</div>
-                </div>
-            `).join('');
-            
-            const riskiest = patronData.reduce((a, b) => parseFloat(a.rate) > parseFloat(b.rate) ? a : b);
-            document.getElementById('patronInsight').textContent = 
-                `Patrons with ${riskiest.prior} prior no-shows have a ${riskiest.rate}% chance of not showing up again. Past behavior is a strong predictor - consider requiring deposits or confirmation calls for repeat offenders.`;
-        }
+// c6 — reasons doughnut
+new Chart(document.getElementById('c6'),{type:'doughnut',
+  data:{labels:['Missing / Not Returned','Under Repair','Reserved / Out','No-Show Block','Admin Hold'],
+    datasets:[{data:[38,24,19,12,7],
+      backgroundColor:[BK,D2,MID,LT,B2],
+      borderWidth:3,borderColor:'#fff',hoverOffset:4}]},
+  options:{responsive:true,maintainAspectRatio:false,cutout:'58%',
+    plugins:{legend:{position:'right',labels:{font:{size:11}}},
+      tooltip:{callbacks:{label:c=>` ${c.label}: ${c.raw}%`}}}}});
 
-        // ============================================
-        // SECTION 4: HUB & TIME HEATMAP
-        // ============================================
-        function updateHeatmapSection() {
-            const timeSlots = getUnique(filteredData, 'Pickup_Time_Slot');
-            const hubIds = getUnique(filteredData, 'Hub_ID').slice(0, 10); // Top 10 hubs
-            
-            // Calculate no-show rates for each hub/time combo
-            const heatmapData = {};
-            let maxRate = 0;
-            
-            hubIds.forEach(hub => {
-                heatmapData[hub] = {};
-                timeSlots.forEach(slot => {
-                    const subset = filteredData.filter(d => d.Hub_ID === hub && d.Pickup_Time_Slot === slot);
-                    if (subset.length > 0) {
-                        const noShows = subset.filter(d => d.No_Show === 1).length;
-                        const rate = (noShows / subset.length) * 100;
-                        heatmapData[hub][slot] = { rate, count: subset.length };
-                        if (rate > maxRate) maxRate = rate;
-                    }
-                });
-            });
-            
-            // Generate heatmap HTML
-            const getColor = (rate) => {
-                if (rate === undefined) return 'rgba(255,255,255,0.03)';
-                const intensity = rate / (maxRate || 1);
-                if (intensity > 0.7) return colors.coral;
-                if (intensity > 0.4) return colors.amber;
-                if (intensity > 0.2) return colors.teal;
-                return colors.emerald;
-            };
-            
-            let html = `
-                <div style="display: grid; grid-template-columns: 80px repeat(${timeSlots.length}, 1fr); gap: 4px; align-items: center;">
-                    <div></div>
-                    ${timeSlots.map(s => `<div class="heatmap-label">${s}</div>`).join('')}
-            `;
-            
-            hubIds.forEach(hub => {
-                html += `<div class="heatmap-label" style="text-align: right;">Hub ${hub}</div>`;
-                timeSlots.forEach(slot => {
-                    const data = heatmapData[hub][slot];
-                    const rate = data ? data.rate.toFixed(0) : '-';
-                    const bg = getColor(data?.rate);
-                    const textColor = data && data.rate > 30 ? '#fff' : '#94a3b8';
-                    html += `
-                        <div class="heatmap-cell" 
-                             style="background: ${bg}; color: ${textColor}; height: 50px;"
-                             title="Hub ${hub}, ${slot}: ${rate}% no-show rate${data ? ` (${data.count} reservations)` : ''}">
-                            ${rate}%
-                        </div>
-                    `;
-                });
-            });
-            
-            html += '</div>';
-            document.getElementById('heatmapContainer').innerHTML = html;
-            
-            // Legend
-            document.getElementById('heatmapLegend').innerHTML = `
-                <div class="legend-item"><div class="legend-color" style="background: ${colors.emerald}"></div> Low Risk (0-20%)</div>
-                <div class="legend-item"><div class="legend-color" style="background: ${colors.teal}"></div> Moderate (20-40%)</div>
-                <div class="legend-item"><div class="legend-color" style="background: ${colors.amber}"></div> High (40-70%)</div>
-                <div class="legend-item"><div class="legend-color" style="background: ${colors.coral}"></div> Critical (70%+)</div>
-            `;
-            
-            // Find worst combination
-            let worst = { hub: '', slot: '', rate: 0 };
-            Object.entries(heatmapData).forEach(([hub, slots]) => {
-                Object.entries(slots).forEach(([slot, data]) => {
-                    if (data.rate > worst.rate) {
-                        worst = { hub, slot, rate: data.rate };
-                    }
-                });
-            });
-            
-            document.getElementById('heatmapInsight').textContent = 
-                worst.rate > 0 
-                    ? `Hub ${worst.hub} during ${worst.slot} shows the highest stress with ${worst.rate.toFixed(1)}% no-show rate. Consider additional staffing or overbooking strategies for this combination.`
-                    : 'Apply filters to see hub and time slot patterns in your data.';
-        }
+// c7 — availability trend
+new Chart(document.getElementById('c7'),{type:'line',
+  data:{labels:M,datasets:[
+    {label:'Available Inventory (%)',data:[52,50,49,47,46,44,43,42,41,40,39,39],
+      borderColor:BK,backgroundColor:'rgba(0,0,0,.04)',fill:true,tension:.4,
+      pointRadius:3,pointBackgroundColor:BK,borderWidth:2},
+    {label:'Target (75%)',data:[75,75,75,75,75,75,75,75,75,75,75,75],
+      borderColor:MUT,borderDash:[6,4],borderWidth:1.5,pointRadius:0,fill:false}
+  ]},
+  options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{position:'top'}},
+    scales:{x:{grid:{display:false}},y:{min:0,max:100,grid:{color:GR},ticks:{callback:v=>v+'%'}}}}});
 
-        // ============================================
-        // SECTION 5: INVENTORY IMPACT
-        // ============================================
-        function updateImpactSection() {
-            const noShowData = filteredData.filter(d => d.No_Show === 1);
-            const showData = filteredData.filter(d => d.No_Show === 0);
-            
-            const totalBlockedNoShow = sum(noShowData.map(d => d.Blocked_Hours));
-            const totalStaffNoShow = sum(noShowData.map(d => d.Staff_Preparation_Time_Min));
-            const avgBlockedNoShow = noShowData.length > 0 ? mean(noShowData.map(d => d.Blocked_Hours)).toFixed(1) : 0;
-            const avgStaffNoShow = noShowData.length > 0 ? mean(noShowData.map(d => d.Staff_Preparation_Time_Min)).toFixed(1) : 0;
-            
-            // Metrics
-            document.getElementById('impactMetrics').innerHTML = `
-                <div class="metric-card">
-                    <div class="metric-card-label">Wasted Blocked Hours</div>
-                    <div class="metric-card-value" style="color: ${colors.coral}">${totalBlockedNoShow}h</div>
-                    <div class="metric-card-change negative">From no-shows only</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-card-label">Wasted Staff Time</div>
-                    <div class="metric-card-value" style="color: ${colors.amber}">${totalStaffNoShow}m</div>
-                    <div class="metric-card-change negative">Prep with no pickup</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-card-label">Avg Block per No-Show</div>
-                    <div class="metric-card-value" style="color: ${colors.purple}">${avgBlockedNoShow}h</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-card-label">Avg Prep per No-Show</div>
-                    <div class="metric-card-value" style="color: ${colors.teal}">${avgStaffNoShow}m</div>
-                </div>
-            `;
-            
-            // Blocked Hours comparison chart
-            if (charts.blockedHours) charts.blockedHours.destroy();
-            
-            const blockedCtx = document.getElementById('blockedHoursChart').getContext('2d');
-            charts.blockedHours = new Chart(blockedCtx, {
-                type: 'bar',
-                data: {
-                    labels: ['Showed Up', 'No-Show'],
-                    datasets: [{
-                        label: 'Avg Blocked Hours',
-                        data: [
-                            showData.length > 0 ? mean(showData.map(d => d.Blocked_Hours)).toFixed(1) : 0,
-                            avgBlockedNoShow
-                        ],
-                        backgroundColor: [colors.emerald, colors.coral],
-                        borderRadius: 8
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    indexAxis: 'y',
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        x: {
-                            grid: { color: 'rgba(255,255,255,0.05)' },
-                            ticks: { color: '#64748b' }
-                        },
-                        y: {
-                            grid: { display: false },
-                            ticks: { color: '#94a3b8' }
-                        }
-                    }
-                }
-            });
-            
-            // Staff time comparison
-            if (charts.staffTime) charts.staffTime.destroy();
-            
-            const staffCtx = document.getElementById('staffTimeChart').getContext('2d');
-            charts.staffTime = new Chart(staffCtx, {
-                type: 'bar',
-                data: {
-                    labels: ['Showed Up', 'No-Show'],
-                    datasets: [{
-                        label: 'Avg Staff Prep (min)',
-                        data: [
-                            showData.length > 0 ? mean(showData.map(d => d.Staff_Preparation_Time_Min)).toFixed(1) : 0,
-                            avgStaffNoShow
-                        ],
-                        backgroundColor: [colors.emerald, colors.coral],
-                        borderRadius: 8
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    indexAxis: 'y',
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        x: {
-                            grid: { color: 'rgba(255,255,255,0.05)' },
-                            ticks: { color: '#64748b' }
-                        },
-                        y: {
-                            grid: { display: false },
-                            ticks: { color: '#94a3b8' }
-                        }
-                    }
-                }
-            });
-            
-            document.getElementById('impactInsight').textContent = 
-                `No-shows have cost ${totalBlockedNoShow} hours of blocked inventory and ${totalStaffNoShow} minutes of staff preparation time. Each no-show wastes an average of ${avgBlockedNoShow} blocked hours - time when other patrons could have used the equipment.`;
-        }
+// c8 — impact comparison
+new Chart(document.getElementById('c8'),{type:'bar',
+  data:{labels:['No-Shows (Temp)','Missing Items (Permanent)'],
+    datasets:[{label:'Inventory Days Lost / Month',data:[1460,6132],
+      backgroundColor:[LT,BK],borderRadius:5,borderSkipped:false}]},
+  options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.raw.toLocaleString()} days/month`}}},
+    scales:{x:{grid:{display:false}},y:{grid:{color:GR}}}}});
 
-        // ============================================
-        // UPDATE ALL
-        // ============================================
-        function updateAllCharts() {
-            updateHeroStats();
-            updateRiskSection();
-            updateLeadTimeSection();
-            updatePatronSection();
-            updateHeatmapSection();
-            updateImpactSection();
-        }
+// c9 — noshow bars
+new Chart(document.getElementById('c9'),{type:'bar',
+  data:{labels:['Tools','Sports','Camping','Overall'],
+    datasets:[{label:'No-Show Rate (%)',data:[27.8,30.1,29.7,29.2],
+      backgroundColor:[B2,B2,B2,D2],borderRadius:4,borderSkipped:false}]},
+  options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false}},
+    scales:{x:{grid:{display:false}},y:{min:0,max:40,grid:{color:GR},ticks:{callback:v=>v+'%'}}}}});
 
-        // ============================================
-        // INITIALIZE
-        // ============================================
-        document.addEventListener('DOMContentLoaded', () => {
-            Chart.defaults.font.family = 'Space Grotesk';
-            initFilters();
-            updateAllCharts();
-        });
-    </script>
+// c10 — projected improvement
+new Chart(document.getElementById('c10'),{type:'bar',
+  data:{labels:['Non-Return Rate','Damage Rate','Unavailability'],
+    datasets:[
+      {label:'Current',data:[23.4,38.7,61.2],backgroundColor:D2,borderRadius:[4,4,0,0],borderSkipped:false},
+      {label:'After QR System',data:[8,20,25],backgroundColor:LT,borderRadius:[4,4,0,0],borderSkipped:false}
+    ]},
+  options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{position:'top'}},
+    scales:{x:{grid:{display:false}},y:{min:0,max:70,grid:{color:GR},ticks:{callback:v=>v+'%'}}}}});
+
+// HUB GRID
+const hubs=[
+  {id:3,name:'North York',miss:31,dmg:42,avail:27},
+  {id:6,name:'Annex',miss:29,dmg:38,avail:31},
+  {id:9,name:'St Clair W.',miss:27,dmg:36,avail:34},
+  {id:2,name:'Scarborough',miss:24,dmg:33,avail:36},
+  {id:8,name:'Roncesvalles',miss:22,dmg:30,avail:38},
+  {id:1,name:'Downtown',miss:19,dmg:28,avail:42},
+  {id:7,name:'Danforth',miss:18,dmg:26,avail:45},
+  {id:4,name:'Etobicoke',miss:17,dmg:24,avail:47},
+  {id:11,name:'Junction',miss:16,dmg:22,avail:50},
+  {id:5,name:'Yorkdale',miss:15,dmg:20,avail:53},
+  {id:12,name:'Riverdale',miss:14,dmg:18,avail:56},
+  {id:10,name:'Leslieville',miss:12,dmg:15,avail:62},
+];
+function barRow(label,val,max,dark){
+  const w=Math.round((val/max)*100);
+  return`<div class="bar-row">
+    <div class="bar-label-row"><span>${label}</span><span style="color:${dark?'#1a1a1a':'#888'};font-weight:700;font-family:'JetBrains Mono',monospace;font-size:10px;">${val}%</span></div>
+    <div class="bar-track"><div style="height:100%;width:${w}%;background:${dark?'#1a1a1a':'#cccccc'};border-radius:2px;"></div></div>
+  </div>`;
+}
+document.getElementById('hub-grid').innerHTML=hubs.map(h=>`
+  <div class="hub-card">
+    <div class="hub-name">Hub ${h.id} &mdash; ${h.name}</div>
+    ${barRow('Missing',h.miss,35,true)}
+    ${barRow('Damage',h.dmg,45,false)}
+    ${barRow('Available',h.avail,100,false)}
+  </div>`).join('');
+
+// FILTER
+function applyFilter(){
+  const hub=document.getElementById('f-hub').value;
+  const cat=document.getElementById('f-cat').value;
+  const period=document.getElementById('f-period').value;
+  let r=2500,h=12;
+  if(hub!=='all'){r=Math.floor(r/12);h=1;}
+  if(cat!=='all')r=Math.floor(r/3);
+  if(period!=='all')r=Math.floor(r/4);
+  document.getElementById('f-count').textContent=`Showing ${r.toLocaleString()} records \u2014 ${h} hub${h>1?'s':''}`;
+  toast('Filter applied');
+}
+function resetFilter(){
+  ['f-hub','f-cat','f-period'].forEach(id=>document.getElementById(id).value='all');
+  document.getElementById('f-count').textContent='Showing 2,500 records \u2014 12 hubs';
+  toast('Filters reset');
+}
+let tt;
+function toast(msg){
+  const e=document.getElementById('toast');
+  document.getElementById('tmsg').textContent=msg;
+  e.classList.add('show');
+  clearTimeout(tt);tt=setTimeout(()=>e.classList.remove('show'),2800);
+}
+</script>
 </body>
 </html>
